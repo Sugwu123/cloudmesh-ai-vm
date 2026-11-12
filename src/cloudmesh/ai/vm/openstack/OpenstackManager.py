@@ -1,3 +1,4 @@
+from __future__ import annotations
 import builtins
 from pathlib import Path
 from typing import Any
@@ -1524,3 +1525,35 @@ class OpenstackManager(CloudBaseManager):
         """Normalizes status, treating 'active' as 'running'."""
         normalized = super()._normalize_status(status)
         return "running" if normalized == "active" else normalized
+
+
+    def list_floating_ips(self) -> list[dict[str, Any]]:
+        """List floating IPs allocated in the OpenStack project."""
+        if not getattr(self, "conn", None):
+            return []
+        results: list[dict[str, Any]] = []
+        try:
+            for ip_obj in self.conn.network.ips():
+                addr = getattr(ip_obj, "floating_ip_address", None) or (ip_obj.get("floating_ip_address") if isinstance(ip_obj, dict) else None)
+                ip_id = getattr(ip_obj, "id", None) or (ip_obj.get("id") if isinstance(ip_obj, dict) else None)
+                status = getattr(ip_obj, "status", None) or (ip_obj.get("status", "UNKNOWN") if isinstance(ip_obj, dict) else "UNKNOWN")
+                port_id = getattr(ip_obj, "port_id", None) or (ip_obj.get("port_id") if isinstance(ip_obj, dict) else None)
+                results.append({"ip": addr, "id": ip_id, "status": status, "attached": bool(port_id)})
+        except Exception as exc:
+            logger.error(f"Error listing floating IPs: {exc}")
+        return results
+
+    def release_floating_ip_by_ip(self, address: str) -> bool:
+        """Release an OpenStack floating IP by its IP address."""
+        if not getattr(self, "conn", None) or not address:
+            return False
+        try:
+            for ip_obj in self.conn.network.ips():
+                addr = getattr(ip_obj, "floating_ip_address", None) or (ip_obj.get("floating_ip_address") if isinstance(ip_obj, dict) else None)
+                ip_id = getattr(ip_obj, "id", None) or (ip_obj.get("id") if isinstance(ip_obj, dict) else None)
+                if addr == address and ip_id:
+                    self.conn.network.delete_floating_ip(ip_id)
+                    return True
+        except Exception as exc:
+            logger.error(f"Error releasing floating IP {address}: {exc}")
+        return False

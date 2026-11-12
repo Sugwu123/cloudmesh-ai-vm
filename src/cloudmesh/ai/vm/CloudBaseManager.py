@@ -1,3 +1,4 @@
+from __future__ import annotations
 import builtins
 import os
 from abc import ABC
@@ -290,3 +291,20 @@ class CloudBaseManager(BaseVMProvider, ABC):
             return subprocess.run(command, capture_output=False, check=True)
         except subprocess.CalledProcessError as e:
             raise e
+
+
+    def list_floating_ips(self) -> list[dict[str, Any]]:
+        """Return floating IPs for this provider (default no-op stub)."""
+        return []
+
+    def release_floating_ip_by_ip(self, address: str) -> bool:
+        """Release a floating IP by address (default no-op stub)."""
+        return True
+
+    def list_reservations(self) -> list[dict[str, Any]]:
+        """Return active reservations/leases for this provider (default no-op stub)."""
+        return []
+
+    def delete_reservation(self, res_id: str) -> bool:
+        """Delete a reservation/lease by ID (default no-op stub)."""
+        return True

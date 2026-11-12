@@ -329,3 +329,41 @@ def resolve_vms(
         vms = [vm_name]
 
     return vms
+
+
+
+from typing import Any
+
+
+def get_enabled_providers(ctx: click.Context | None = None, cloud: str | None = None) -> list[tuple[str, Any]]:
+    """Return a list of (cloud_name, provider_instance) for target or all enabled providers."""
+    from .providers_utils import register_providers
+    from cloudmesh.ai.vm.providers import get_provider
+
+    register_providers()
+
+    explicit_cloud = cloud
+    if not explicit_cloud and ctx is not None and getattr(ctx, "obj", None) is not None:
+        explicit_cloud = getattr(ctx.obj, "cloud_override", None)
+
+    if explicit_cloud:
+        return [(explicit_cloud, get_provider(explicit_cloud))]
+
+    enabled: list[tuple[str, Any]] = []
+    try:
+        if state.config:
+            clouds_cfg = state.config.db.get("clouds", {}) or {}
+            for cname, cdata in clouds_cfg.items():
+                if isinstance(cdata, dict) and cdata.get("enabled", False):
+                    try:
+                        enabled.append((cname, get_provider(cname)))
+                    except Exception:
+                        continue
+    except Exception:
+        pass
+
+    if not enabled and ctx is not None:
+        prov = get_active_provider(ctx)
+        cname = getattr(prov, "cloud", None) or getattr(prov, "name", "multipass")
+        enabled.append((str(cname), prov))
+    return enabled
